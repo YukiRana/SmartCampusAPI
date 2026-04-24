@@ -1,53 +1,73 @@
 package com.mycompany.smartcampusapi.resources;
 
-import java.util.List;
+import com.mycompany.smartcampusapi.exception.ResourceNotFoundException;
+import com.mycompany.smartcampusapi.exception.RoomNotEmptyException;
+import com.mycompany.smartcampusapi.model.Room;
+import com.mycompany.smartcampusapi.service.DataStore;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.*;
 import java.net.URI;
+import java.time.Instant;
+import java.util.*;
 
-import com.mycompany.smartcampusapi.dto.RoomRequest;
-import com.mycompany.smartcampusapi.dto.RoomResponse;
-import com.mycompany.smartcampusapi.service.RoomService;
-
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
-import jakarta.ws.rs.core.Context;
-
+/** @author Yuki Ranathilaka */
 @Path("/rooms")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class RoomResource {
+    private final DataStore store = DataStore.getInstance();
 
-    private final RoomService roomService = new RoomService();
-    
     @GET
-    public List<RoomResponse> getRooms() {
-        return roomService.listRooms();
+    public Response getAllRooms() {
+        List<Room> rooms = new ArrayList<>(store.getRooms().values());
+        rooms.sort(Comparator.comparing(Room::getId));
+        return Response.ok(rooms).build();
     }
-    
+
     @GET
-    @Path("/{id}")
-    public RoomResponse getRoom(@PathParam("id") long id) {
-        return roomService.getRoom(id);
+    @Path("/{roomId}")
+    public Response getRoom(@PathParam("roomId") String roomId) {
+        Room room = store.getRoom(roomId);
+        if (room == null) throw new ResourceNotFoundException("Room '" + roomId + "' was not found.");
+        return Response.ok(room).build();
     }
-    
+
     @POST
-    public Response createRoom(RoomRequest request, @Context UriInfo uriInfo) {
-        RoomResponse created = roomService.createRoom(request);
-        URI location = uriInfo.getAbsolutePathBuilder().path(String.valueOf(created.id())).build();
-        return Response.created(location).entity(created).build();
+    public Response createRoom(Room room, @Context UriInfo uriInfo) {
+        if (room == null || room.getName() == null || room.getName().isBlank()) {
+            throw new WebApplicationException(Response.status(400)
+                .entity(err(400, "Bad Request", "Room 'name' is required.")).build());
+        }
+        if (room.getId() == null || room.getId().isBlank()) {
+            room.setId("ROOM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        }
+        if (store.getRoom(room.getId()) != null) {
+            throw new RoomNotEmptyException("Room ID '" + room.getId() + "' already exists.");
+        }
+        if (room.getSensorIds() == null) room.setSensorIds(new ArrayList<>());
+        store.putRoom(room);
+        URI location = uriInfo.getAbsolutePathBuilder().path(room.getId()).build();
+        return Response.created(location).entity(room).build();
     }
-    
+
     @DELETE
-    @Path("/{id}")
-    public Response deleteRoom(@PathParam("id") long id) {
-        roomService.deleteRoom(id);
+    @Path("/{roomId}")
+    public Response deleteRoom(@PathParam("roomId") String roomId) {
+        Room room = store.getRoom(roomId);
+        if (room == null) throw new ResourceNotFoundException("Room '" + roomId + "' was not found.");
+        if (!room.getSensorIds().isEmpty()) {
+            throw new RoomNotEmptyException("Room '" + roomId + "' cannot be deleted because it still has "
+                + room.getSensorIds().size() + " sensor(s) assigned to it. "
+                + "Remove all sensors before attempting deletion.");
+        }
+        store.removeRoom(roomId);
         return Response.noContent().build();
+    }
+
+    private Map<String, Object> err(int s, String e, String m) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("status", s); map.put("error", e);
+        map.put("message", m); map.put("timestamp", Instant.now().toString());
+        return map;
     }
 }
