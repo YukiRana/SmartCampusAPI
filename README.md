@@ -2,8 +2,8 @@
 
 **Module:** 5COSC022W — Client-Server Architectures (2025/26)
 **Author:** Yuki Ranathilaka
-**University:** University of Westminster
-**Weight:** 60% of final grade
+**University:** Informatics Institute of Technology (University of Westminster)
+
 
 A fully RESTful JAX-RS API for Smart Campus room, sensor, and sensor reading
 management. All data is stored in-memory using `ConcurrentHashMap` — no database
