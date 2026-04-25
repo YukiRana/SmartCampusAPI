@@ -1,41 +1,65 @@
 package com.mycompany.smartcampusapi.resources;
 
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.*;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** @author Yuki Ranathilaka */
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+
+/**
+ * Root discovery endpoint at GET /api/v1.
+ * Returns API metadata, versioning, administrative contact, and HATEOAS links.
+ *
+ * HATEOAS (Hypermedia As The Engine Of Application State):
+ * Embedding navigational links in API responses is a hallmark of mature REST
+ * design because it lets clients discover all available resources dynamically
+ * from a single well-known entry point, rather than relying on hard-coded URLs
+ * or external static documentation. When the server changes a resource path,
+ * clients that follow discovery links adapt automatically without a code change.
+ * This reduces coupling between client and server and eliminates the risk of
+ * stale documentation causing client-side breakage. Compared to static docs,
+ * HATEOAS makes the API self-describing, self-navigable, and more resilient to
+ * server-side evolution.
+ *
+ * @author Yuki Ranathilaka
+ */
 @Path("/")
 @Produces(MediaType.APPLICATION_JSON)
 public class DiscoveryResource {
+
     @GET
     public Response discover(@Context UriInfo uriInfo) {
         String base = uriInfo.getBaseUri().toString();
-        Map<String, Object> contact = new LinkedHashMap<>();
-        contact.put("name", "Yuki Ranathilaka");
-        contact.put("email", "yuki.ranathilaka@smartcampus.ac.uk");
-        contact.put("role", "Lead Backend Architect");
 
-        Map<String, Object> resources = new LinkedHashMap<>();
-        resources.put("rooms", base + "rooms");
-        resources.put("sensors", base + "sensors");
+        Map<String, String> contact = new LinkedHashMap<>();
+        contact.put("name",  "Yuki Ranathilaka");
+        contact.put("email", "yuki.ranathilaka@smartcampus.westminster.ac.uk");
+        contact.put("role",  "Lead Backend Architect");
+
+        Map<String, String> resources = new LinkedHashMap<>();
+        resources.put("rooms",          base + "rooms");
+        resources.put("sensors",        base + "sensors");
         resources.put("sensorReadings", base + "sensors/{sensorId}/readings");
 
-        Map<String, Object> links = new LinkedHashMap<>();
-        links.put("self", base);
-        links.put("rooms", base + "rooms");
+        Map<String, String> links = new LinkedHashMap<>();
+        links.put("self",    base);
+        links.put("rooms",   base + "rooms");
         links.put("sensors", base + "sensors");
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("name", "Smart Campus API");
-        response.put("version", "v1");
-        response.put("description", "RESTful API for Smart Campus sensor and room management");
-        response.put("timestamp", Instant.now().toString());
-        response.put("contact", contact);
-        response.put("resources", resources);
-        response.put("_links", links);
+        response.put("name",        "Smart Campus Sensor & Room Management API");
+        response.put("version",     "v1");
+        response.put("description", "RESTful JAX-RS API for managing campus rooms, sensors and readings.");
+        response.put("timestamp",   System.currentTimeMillis());
+        response.put("contact",     contact);
+        response.put("resources",   resources);
+        response.put("_links",      links);
+
         return Response.ok(response).build();
     }
 }

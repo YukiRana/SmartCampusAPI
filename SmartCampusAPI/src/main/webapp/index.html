@@ -1,54 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>SmartCampusAPI</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <style>
         body {
             margin: 0;
-            min-height: 100vh;
-            font-family: Arial, sans-serif;
-            background: #f4f7fb;
-            color: #1f2937;
-            display: grid;
-            place-items: center;
             padding: 2rem;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
         }
         .card {
-            max-width: 760px;
-            width: 100%;
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
-            border: 1px solid #e5e7eb;
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(30,41,59,0.95);
+            border: 1px solid rgba(148,163,184,0.15);
+            border-radius: 18px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
         }
-        h1 {
-            margin: 0 0 0.75rem;
-        }
-        p {
-            line-height: 1.6;
-        }
-        code {
-            background: #e5eefb;
-            padding: 0.15rem 0.35rem;
-            border-radius: 6px;
-        }
-        ul {
-            padding-left: 1.25rem;
-        }
+        h1 { margin: 0 0 0.4rem; font-size: 2rem; color: #f8fafc; }
+        h2 { margin: 2rem 0 0.6rem; font-size: 1rem; text-transform: uppercase;
+             letter-spacing: 0.08em; color: #94a3b8; }
+        p  { margin: 0.5rem 0; line-height: 1.65; color: #cbd5e1; }
+        code { color: #7dd3fc; font-size: 0.92rem; }
+        .pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+        .pill { background: rgba(59,130,246,0.15); border: 1px solid rgba(96,165,250,0.3);
+                color: #bfdbfe; padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.82rem; }
+        .ep { margin: 0.5rem 0; padding: 0.75rem 1rem; background: rgba(15,23,42,0.7);
+              border-radius: 10px; border: 1px solid rgba(148,163,184,0.1); line-height: 1.9; }
+        .get    { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3);
+                  padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.78rem; font-weight:700; }
+        .post   { background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3);
+                  padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.78rem; font-weight:700; }
+        .delete { background: rgba(239,68,68,0.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3);
+                  padding: 0.1rem 0.45rem; border-radius: 5px; font-size: 0.78rem; font-weight:700; }
+        .footer { margin-top: 2rem; color: #475569; font-size: 0.83rem; }
     </style>
 </head>
 <body>
-    <main class="card">
-        <h1>SmartCampusAPI</h1>
-        <p>Jakarta REST coursework API for rooms, sensors, and readings. The service runs on Tomcat with Jersey at <code>/api/v1</code>.</p>
-        <ul>
-            <li><code>GET /api/v1</code> discovery metadata</li>
-            <li><code>GET /api/v1/rooms</code> and <code>POST /api/v1/rooms</code></li>
-            <li><code>GET /api/v1/sensors?type=...</code> and nested readings</li>
-        </ul>
-        <p>Prepared for submission by Yuki Ranathilaka.</p>
-    </main>
+<div class="card">
+    <h1>&#x1F4F6; Smart Campus API</h1>
+    <p>RESTful JAX-RS API for campus room, sensor and reading management.<br>
+       Author: <strong>Yuki Ranathilaka</strong> &mdash; 5COSC022W Client-Server Architectures 2025/26</p>
+
+    <div class="pills">
+        <span class="pill">Jersey 3.1.6</span>
+        <span class="pill">Tomcat 10.1+</span>
+        <span class="pill">Java 17</span>
+        <span class="pill">In-Memory (ConcurrentHashMap)</span>
+        <span class="pill">JAX-RS / Jakarta EE</span>
+    </div>
+
+    <h2>Base URL</h2>
+    <p><code>http://localhost:8080/SmartCampusAPI/api/v1</code></p>
+
+    <h2>Discovery</h2>
+    <div class="ep">
+        <span class="get">GET</span> <code>/api/v1</code> &mdash; API metadata, contact, and HATEOAS resource links
+    </div>
+
+    <h2>Rooms &mdash; <code>/api/v1/rooms</code></h2>
+    <div class="ep">
+        <span class="get">GET</span>    <code>/api/v1/rooms</code> &mdash; List all rooms<br>
+        <span class="post">POST</span>  <code>/api/v1/rooms</code> &mdash; Create a room (201 + Location)<br>
+        <span class="get">GET</span>    <code>/api/v1/rooms/{roomId}</code> &mdash; Get room by ID<br>
+        <span class="delete">DELETE</span> <code>/api/v1/rooms/{roomId}</code> &mdash; Delete room (409 if sensors exist)
+    </div>
+
+    <h2>Sensors &mdash; <code>/api/v1/sensors</code></h2>
+    <div class="ep">
+        <span class="get">GET</span>    <code>/api/v1/sensors</code> &mdash; List all sensors<br>
+        <span class="get">GET</span>    <code>/api/v1/sensors?type=CO2</code> &mdash; Filter by type (case-insensitive)<br>
+        <span class="post">POST</span>  <code>/api/v1/sensors</code> &mdash; Register sensor (422 if roomId invalid)<br>
+        <span class="get">GET</span>    <code>/api/v1/sensors/{sensorId}</code> &mdash; Get sensor by ID
+    </div>
+
+    <h2>Readings (Sub-Resource) &mdash; <code>/api/v1/sensors/{sensorId}/readings</code></h2>
+    <div class="ep">
+        <span class="get">GET</span>   <code>/api/v1/sensors/{sensorId}/readings</code> &mdash; Reading history<br>
+        <span class="post">POST</span> <code>/api/v1/sensors/{sensorId}/readings</code> &mdash; Add reading (403 if MAINTENANCE)
+    </div>
+
+    <h2>Error Codes</h2>
+    <div class="ep">
+        <strong>400</strong> Bad Request &mdash; Missing required fields<br>
+        <strong>403</strong> Forbidden &mdash; SensorUnavailableException (MAINTENANCE sensor)<br>
+        <strong>404</strong> Not Found &mdash; Room or sensor does not exist<br>
+        <strong>409</strong> Conflict &mdash; RoomNotEmptyException (delete room with sensors)<br>
+        <strong>422</strong> Unprocessable Entity &mdash; LinkedResourceNotFoundException (bad roomId)<br>
+        <strong>500</strong> Internal Server Error &mdash; GlobalExceptionMapper catch-all (no stack trace)
+    </div>
+
+    <p class="footer">University of Westminster &mdash; Yuki Ranathilaka &mdash; 2025/26</p>
+</div>
 </body>
 </html>

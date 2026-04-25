@@ -1,83 +1,138 @@
 package com.mycompany.smartcampusapi.resources;
 
-import com.mycompany.smartcampusapi.exception.LinkedResourceNotFoundException;
-import com.mycompany.smartcampusapi.exception.ResourceNotFoundException;
-import com.mycompany.smartcampusapi.model.Room;
+import java.net.URI;
+import java.util.List;
+import java.util.UUID;
+
+import com.mycompany.smartcampusapi.model.ApiError;
 import com.mycompany.smartcampusapi.model.Sensor;
 import com.mycompany.smartcampusapi.service.DataStore;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.*;
-import java.net.URI;
-import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
 
-/** @author Yuki Ranathilaka */
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+
+/**
+ * Sensor resource at /api/v1/sensors.
+ *
+ * @Consumes(APPLICATION_JSON) consequences:
+ * If a client sends a POST with Content-Type: text/plain or application/xml,
+ * JAX-RS automatically returns HTTP 415 Unsupported Media Type before this
+ * method is ever invoked. No MessageBodyReader exists for those types in this
+ * configuration, so the framework rejects the request at the content-negotiation
+ * layer. This protects the resource method from receiving malformed input.
+ *
+ * @QueryParam vs path segment for filtering:
+ * GET /sensors?type=CO2 uses a query parameter, which is semantically correct
+ * because it represents an optional constraint on the collection, not a resource
+ * identity. A path-segment approach (/sensors/type/CO2) incorrectly implies that
+ * "CO2" is a uniquely addressable sub-resource with its own identity in the URI
+ * hierarchy. Query parameters also compose cleanly without new routes:
+ * ?type=CO2&status=ACTIVE requires no extra path definitions, whereas
+ * path segments would need a new route per combination.
+ *
+ * Sub-Resource Locator pattern benefits:
+ * The getReadingsLocator method has no HTTP method annotation — JAX-RS recognises
+ * it as a locator and delegates /sensors/{id}/readings to SensorReadingResource.
+ * This keeps reading-history logic isolated in its own class, reducing the size
+ * and complexity of this controller. Adding new reading endpoints (e.g. /summary)
+ * only requires changes to SensorReadingResource, not this file.
+ *
+ * @author Yuki Ranathilaka
+ */
 @Path("/sensors")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class SensorResource {
-    private final DataStore store = DataStore.getInstance();
 
     @GET
     public Response getSensors(@QueryParam("type") String type) {
-        List<Sensor> sensors = new ArrayList<>(store.getSensors().values());
-        if (type != null && !type.isBlank()) {
-            String f = type.trim().toLowerCase();
-            sensors = sensors.stream()
-                .filter(s -> s.getType() != null && s.getType().toLowerCase().contains(f))
-                .collect(Collectors.toList());
-        }
-        sensors.sort(Comparator.comparing(Sensor::getId));
+        List<Sensor> sensors = DataStore.getSensorsByType(type);
+        sensors.sort((a, b) -> a.getId().compareTo(b.getId()));
         return Response.ok(sensors).build();
     }
 
     @GET
     @Path("/{sensorId}")
-    public Response getSensor(@PathParam("sensorId") String sensorId) {
-        Sensor sensor = store.getSensor(sensorId);
-        if (sensor == null) throw new ResourceNotFoundException("Sensor '" + sensorId + "' was not found.");
+    public Response getSensorById(@PathParam("sensorId") String sensorId,
+                                  @Context UriInfo uriInfo) {
+        Sensor sensor = DataStore.getSensor(sensorId);
+        if (sensor == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ApiError(404, "Not Found",
+                            "Sensor '" + sensorId + "' was not found.",
+                            uriInfo.getPath()))
+                    .build();
+        }
         return Response.ok(sensor).build();
     }
 
     @POST
     public Response createSensor(Sensor sensor, @Context UriInfo uriInfo) {
-        if (sensor == null || sensor.getType() == null || sensor.getType().isBlank()) {
-            throw new WebApplicationException(Response.status(400)
-                .entity(err(400, "Bad Request", "Sensor 'type' is required.")).build());
+        if (sensor == null
+                || isBlank(sensor.getType())
+                || isBlank(sensor.getRoomId())) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ApiError(400, "Bad Request",
+                            "Sensor must include 'type' and 'roomId'.",
+                            uriInfo.getPath()))
+                    .build();
         }
-        if (sensor.getRoomId() == null || sensor.getRoomId().isBlank()) {
-            throw new LinkedResourceNotFoundException("Sensor 'roomId' is required.");
+        if (isBlank(sensor.getId())) {
+            sensor.setId(sensor.getType().toUpperCase()
+                    .replaceAll("[^A-Z0-9]", "")
+                    + "-" + UUID.randomUUID().toString()
+                    .substring(0, 6).toUpperCase());
         }
-        Room room = store.getRoom(sensor.getRoomId());
-        if (room == null) {
-            throw new LinkedResourceNotFoundException(
-                "The roomId '" + sensor.getRoomId() + "' does not reference an existing room.");
-        }
-        if (sensor.getId() == null || sensor.getId().isBlank()) {
-            sensor.setId(sensor.getType().toUpperCase().replaceAll("[^A-Z0-9]", "")
-                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase());
-        }
-        if (sensor.getStatus() == null || sensor.getStatus().isBlank()) {
+        if (isBlank(sensor.getStatus())) {
             sensor.setStatus("ACTIVE");
         }
-        room.getSensorIds().add(sensor.getId());
-        store.putSensor(sensor);
-        URI location = uriInfo.getAbsolutePathBuilder().path(sensor.getId()).build();
-        return Response.created(location).entity(sensor).build();
+        Sensor clean = new Sensor(
+                sensor.getId().trim(),
+                sensor.getType().trim(),
+                sensor.getStatus().trim().toUpperCase(),
+                sensor.getCurrentValue(),
+                sensor.getRoomId().trim());
+
+        // DataStore.addSensor throws LinkedResourceNotFoundException (-> 422)
+        // if roomId does not exist — caught by LinkedResourceNotFoundExceptionMapper
+        boolean created = DataStore.addSensor(clean);
+        if (!created) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(new ApiError(409, "Conflict",
+                            "A sensor with id '" + clean.getId() + "' already exists.",
+                            uriInfo.getPath()))
+                    .build();
+        }
+        URI location = uriInfo.getAbsolutePathBuilder()
+                .path(clean.getId()).build();
+        return Response.created(location).entity(clean).build();
     }
 
+    /**
+     * Sub-resource locator — no HTTP method annotation.
+     * Delegates all /sensors/{sensorId}/readings requests to SensorReadingResource.
+     */
     @Path("/{sensorId}/readings")
-    public SensorReadingResource getReadingsLocator(@PathParam("sensorId") String sensorId) {
-        if (store.getSensor(sensorId) == null)
-            throw new ResourceNotFoundException("Sensor '" + sensorId + "' was not found.");
-        return new SensorReadingResource(sensorId, store);
+    public SensorReadingResource getReadingsLocator(
+            @PathParam("sensorId") String sensorId,
+            @Context UriInfo uriInfo) {
+        if (DataStore.getSensor(sensorId) == null) {
+            throw new jakarta.ws.rs.NotFoundException(
+                    "Sensor '" + sensorId + "' was not found.");
+        }
+        return new SensorReadingResource(sensorId);
     }
 
-    private Map<String, Object> err(int s, String e, String m) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("status", s); map.put("error", e);
-        map.put("message", m); map.put("timestamp", Instant.now().toString());
-        return map;
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

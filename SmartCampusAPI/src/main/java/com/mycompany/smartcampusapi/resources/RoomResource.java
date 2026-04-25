@@ -1,73 +1,125 @@
 package com.mycompany.smartcampusapi.resources;
 
-import com.mycompany.smartcampusapi.exception.ResourceNotFoundException;
-import com.mycompany.smartcampusapi.exception.RoomNotEmptyException;
+import java.net.URI;
+import java.util.List;
+import java.util.UUID;
+
+import com.mycompany.smartcampusapi.model.ApiError;
 import com.mycompany.smartcampusapi.model.Room;
 import com.mycompany.smartcampusapi.service.DataStore;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.*;
-import java.net.URI;
-import java.time.Instant;
-import java.util.*;
 
-/** @author Yuki Ranathilaka */
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+
+/**
+ * Room resource handling CRUD at /api/v1/rooms.
+ *
+ * Returning full objects vs IDs only:
+ * Returning full Room objects in list responses gives clients all fields
+ * (id, name, capacity, sensorIds) in a single round-trip with no follow-up
+ * requests needed. Returning IDs only would reduce payload size but creates the
+ * N+1 problem: a client must fire one GET per room to retrieve details, which
+ * multiplies latency under a large collection. For a Smart Campus system with
+ * a manageable room count, full objects are the right trade-off.
+ *
+ * DELETE idempotency:
+ * The first DELETE on an existing room returns 204 No Content.
+ * A second identical DELETE returns 404 Not Found because the room is gone.
+ * The server-side state after both calls is identical — the room does not exist.
+ * The HTTP specification defines idempotency as identical effect on server state,
+ * not identical response codes, so DELETE is idempotent. The 409 guard prevents
+ * accidental orphaning of sensors that still reference the parent room.
+ *
+ * @author Yuki Ranathilaka
+ */
 @Path("/rooms")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class RoomResource {
-    private final DataStore store = DataStore.getInstance();
 
     @GET
     public Response getAllRooms() {
-        List<Room> rooms = new ArrayList<>(store.getRooms().values());
-        rooms.sort(Comparator.comparing(Room::getId));
+        List<Room> rooms = DataStore.getAllRooms();
+        rooms.sort((a, b) -> a.getId().compareTo(b.getId()));
         return Response.ok(rooms).build();
     }
 
     @GET
     @Path("/{roomId}")
-    public Response getRoom(@PathParam("roomId") String roomId) {
-        Room room = store.getRoom(roomId);
-        if (room == null) throw new ResourceNotFoundException("Room '" + roomId + "' was not found.");
+    public Response getRoomById(@PathParam("roomId") String roomId,
+                                @Context UriInfo uriInfo) {
+        Room room = DataStore.getRoom(roomId);
+        if (room == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ApiError(404, "Not Found",
+                            "Room '" + roomId + "' was not found.",
+                            uriInfo.getPath()))
+                    .build();
+        }
         return Response.ok(room).build();
     }
 
     @POST
     public Response createRoom(Room room, @Context UriInfo uriInfo) {
-        if (room == null || room.getName() == null || room.getName().isBlank()) {
-            throw new WebApplicationException(Response.status(400)
-                .entity(err(400, "Bad Request", "Room 'name' is required.")).build());
+        if (room == null
+                || isBlank(room.getName())
+                || room.getCapacity() <= 0) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ApiError(400, "Bad Request",
+                            "Room must include a non-blank 'name' and "
+                            + "a 'capacity' greater than 0.",
+                            uriInfo.getPath()))
+                    .build();
         }
-        if (room.getId() == null || room.getId().isBlank()) {
-            room.setId("ROOM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        if (isBlank(room.getId())) {
+            room.setId("ROOM-" + UUID.randomUUID().toString()
+                    .substring(0, 8).toUpperCase());
         }
-        if (store.getRoom(room.getId()) != null) {
-            throw new RoomNotEmptyException("Room ID '" + room.getId() + "' already exists.");
+        Room cleanRoom = new Room(
+                room.getId().trim(),
+                room.getName().trim(),
+                room.getCapacity());
+
+        boolean created = DataStore.addRoom(cleanRoom);
+        if (!created) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(new ApiError(409, "Conflict",
+                            "A room with id '" + cleanRoom.getId() + "' already exists.",
+                            uriInfo.getPath()))
+                    .build();
         }
-        if (room.getSensorIds() == null) room.setSensorIds(new ArrayList<>());
-        store.putRoom(room);
-        URI location = uriInfo.getAbsolutePathBuilder().path(room.getId()).build();
-        return Response.created(location).entity(room).build();
+        URI location = uriInfo.getAbsolutePathBuilder()
+                .path(cleanRoom.getId()).build();
+        return Response.created(location).entity(cleanRoom).build();
     }
 
     @DELETE
     @Path("/{roomId}")
-    public Response deleteRoom(@PathParam("roomId") String roomId) {
-        Room room = store.getRoom(roomId);
-        if (room == null) throw new ResourceNotFoundException("Room '" + roomId + "' was not found.");
-        if (!room.getSensorIds().isEmpty()) {
-            throw new RoomNotEmptyException("Room '" + roomId + "' cannot be deleted because it still has "
-                + room.getSensorIds().size() + " sensor(s) assigned to it. "
-                + "Remove all sensors before attempting deletion.");
+    public Response deleteRoom(@PathParam("roomId") String roomId,
+                               @Context UriInfo uriInfo) {
+        // DataStore.deleteRoom throws RoomNotEmptyException (-> 409)
+        // if sensors are still assigned — caught by RoomNotEmptyExceptionMapper
+        boolean deleted = DataStore.deleteRoom(roomId);
+        if (!deleted) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ApiError(404, "Not Found",
+                            "Room '" + roomId + "' was not found.",
+                            uriInfo.getPath()))
+                    .build();
         }
-        store.removeRoom(roomId);
         return Response.noContent().build();
     }
 
-    private Map<String, Object> err(int s, String e, String m) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("status", s); map.put("error", e);
-        map.put("message", m); map.put("timestamp", Instant.now().toString());
-        return map;
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

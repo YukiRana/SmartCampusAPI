@@ -8,10 +8,12 @@
     <version>v1</version>
     <packaging>war</packaging>
     <name>SmartCampusAPI-v1</name>
+
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jersey.version>3.1.6</jersey.version>
     </properties>
+
     <dependencies>
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
@@ -41,6 +43,7 @@
             <version>${jersey.version}</version>
         </dependency>
     </dependencies>
+
     <build>
         <plugins>
             <plugin>

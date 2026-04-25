@@ -1,63 +1,100 @@
 package com.mycompany.smartcampusapi.resources;
 
-import com.mycompany.smartcampusapi.exception.SensorUnavailableException;
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.mycompany.smartcampusapi.model.ApiError;
 import com.mycompany.smartcampusapi.model.Sensor;
 import com.mycompany.smartcampusapi.model.SensorReading;
 import com.mycompany.smartcampusapi.service.DataStore;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.*;
-import java.util.*;
 
-/** @author Yuki Ranathilaka */
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
+
+/**
+ * Sub-resource for sensor reading history.
+ * Served at /api/v1/sensors/{sensorId}/readings via SensorResource's locator.
+ * Never registered directly in JakartaRestConfiguration.
+ *
+ * A successful POST performs a side-effect update on the parent Sensor's
+ * currentValue field so that GET /sensors/{id} always reflects the most
+ * recent recorded measurement, maintaining data consistency across the API.
+ *
+ * @author Yuki Ranathilaka
+ */
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class SensorReadingResource {
-    private final String sensorId;
-    private final DataStore store;
 
-    public SensorReadingResource(String sensorId, DataStore store) {
+    private final String sensorId;
+
+    public SensorReadingResource(String sensorId) {
         this.sensorId = sensorId;
-        this.store = store;
     }
 
     @GET
-    public Response getReadings() {
-        List<SensorReading> readings = new ArrayList<>(store.getReadings(sensorId));
-        readings.sort(Comparator.comparingLong(SensorReading::getTimestamp));
-        Sensor sensor = store.getSensor(sensorId);
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("sensorId", sensorId);
-        if (sensor != null) {
-            response.put("sensorType", sensor.getType());
-            response.put("sensorStatus", sensor.getStatus());
-            response.put("currentValue", sensor.getCurrentValue());
+    public Response getReadings(@Context UriInfo uriInfo) {
+        Sensor sensor = DataStore.getSensor(sensorId);
+        if (sensor == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ApiError(404, "Not Found",
+                            "Sensor '" + sensorId + "' was not found.",
+                            uriInfo.getPath()))
+                    .build();
         }
-        response.put("totalReadings", readings.size());
-        response.put("readings", readings);
-        return Response.ok(response).build();
+        List<SensorReading> readings = DataStore.getReadings(sensorId);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("sensorId",      sensorId);
+        body.put("sensorType",    sensor.getType());
+        body.put("sensorStatus",  sensor.getStatus());
+        body.put("currentValue",  sensor.getCurrentValue());
+        body.put("totalReadings", readings.size());
+        body.put("readings",      readings);
+        return Response.ok(body).build();
     }
 
     @POST
-    public Response addReading(SensorReading reading, @Context UriInfo uriInfo) {
-        Sensor sensor = store.getSensor(sensorId);
-        if ("MAINTENANCE".equalsIgnoreCase(sensor.getStatus())) {
-            throw new SensorUnavailableException("Sensor '" + sensorId
-                + "' is in MAINTENANCE status and cannot accept new readings.");
+    public Response createReading(SensorReading reading,
+                                  @Context UriInfo uriInfo) {
+        Sensor sensor = DataStore.getSensor(sensorId);
+        if (sensor == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ApiError(404, "Not Found",
+                            "Sensor '" + sensorId + "' was not found.",
+                            uriInfo.getPath()))
+                    .build();
         }
-        if (reading == null) reading = new SensorReading();
-        reading.setId(UUID.randomUUID().toString());
-        reading.setTimestamp(System.currentTimeMillis());
-        store.addReading(sensorId, reading);
-        // Side effect: update parent sensor currentValue for data consistency
-        sensor.setCurrentValue(reading.getValue());
+        if (reading == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ApiError(400, "Bad Request",
+                            "Request body must contain a SensorReading with a 'value'.",
+                            uriInfo.getPath()))
+                    .build();
+        }
+        // DataStore.addReading throws SensorUnavailableException (-> 403)
+        // if sensor status is MAINTENANCE — caught by SensorUnavailableExceptionMapper
+        SensorReading saved = DataStore.addReading(sensorId, reading);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("sensorId", sensorId);
-        response.put("readingId", reading.getId());
-        response.put("value", reading.getValue());
-        response.put("timestamp", reading.getTimestamp());
-        response.put("currentValue", sensor.getCurrentValue());
-        response.put("message", "Reading recorded. Sensor currentValue updated.");
-        return Response.status(Response.Status.CREATED).entity(response).build();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("sensorId",            sensorId);
+        body.put("readingId",           saved.getId());
+        body.put("value",               saved.getValue());
+        body.put("timestamp",           saved.getTimestamp());
+        body.put("updatedCurrentValue", sensor.getCurrentValue());
+        body.put("message",
+                "Reading recorded successfully. Sensor currentValue updated.");
+
+        URI location = uriInfo.getAbsolutePathBuilder()
+                .path(saved.getId()).build();
+        return Response.created(location).entity(body).build();
     }
 }
