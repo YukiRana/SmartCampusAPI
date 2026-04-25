@@ -1,4 +1,9 @@
-#
-/SmartCampusAPI/target/
-/SmartCampusAPI/smartcampusdb.mv.db
-/SmartCampusAPI/smartcampusdb.trace.db
+# Build outputs
+/target/
+
+# Local H2 database files
+/smartcampusdb.mv.db
+/smartcampusdb.trace.db
+
+# Legacy nested project copy (do not track if recreated)
+/SmartCampusAPI/
