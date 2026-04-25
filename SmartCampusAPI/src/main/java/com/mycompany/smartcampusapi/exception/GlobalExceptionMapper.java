@@ -5,17 +5,17 @@ import java.util.logging.Logger;
 
 import com.mycompany.smartcampusapi.model.ApiError;
 
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
-import jakarta.ws.rs.ext.ExceptionMapper;
-import jakarta.ws.rs.ext.Provider;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
+import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.Provider;
 
 /**
  * Catch-all safety net. Intercepts any unhandled Throwable and returns a
- * sanitised HTTP 500 response — never exposing raw stack traces to clients.
+ * sanitised HTTP 500 response â€” never exposing raw stack traces to clients.
  *
  * Cybersecurity rationale: raw stack traces reveal internal package names and
  * class paths (allowing targeted exploitation), exact framework and library

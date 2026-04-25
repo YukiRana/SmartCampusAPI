@@ -8,17 +8,17 @@ import com.mycompany.smartcampusapi.model.ApiError;
 import com.mycompany.smartcampusapi.model.Room;
 import com.mycompany.smartcampusapi.service.DataStore;
 
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 
 /**
  * Room resource handling CRUD at /api/v1/rooms.
@@ -34,7 +34,7 @@ import jakarta.ws.rs.core.UriInfo;
  * DELETE idempotency:
  * The first DELETE on an existing room returns 204 No Content.
  * A second identical DELETE returns 404 Not Found because the room is gone.
- * The server-side state after both calls is identical — the room does not exist.
+ * The server-side state after both calls is identical â€” the room does not exist.
  * The HTTP specification defines idempotency as identical effect on server state,
  * not identical response codes, so DELETE is idempotent. The 409 guard prevents
  * accidental orphaning of sensors that still reference the parent room.
@@ -107,7 +107,7 @@ public class RoomResource {
     public Response deleteRoom(@PathParam("roomId") String roomId,
                                @Context UriInfo uriInfo) {
         // DataStore.deleteRoom throws RoomNotEmptyException (-> 409)
-        // if sensors are still assigned — caught by RoomNotEmptyExceptionMapper
+        // if sensors are still assigned â€” caught by RoomNotEmptyExceptionMapper
         boolean deleted = DataStore.deleteRoom(roomId);
         if (!deleted) {
             return Response.status(Response.Status.NOT_FOUND)

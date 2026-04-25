@@ -8,8 +8,8 @@ import com.mycompany.smartcampusapi.filter.ApiLoggingFilter;
 import com.mycompany.smartcampusapi.resources.DiscoveryResource;
 import com.mycompany.smartcampusapi.resources.RoomResource;
 import com.mycompany.smartcampusapi.resources.SensorResource;
-import jakarta.ws.rs.ApplicationPath;
-import jakarta.ws.rs.core.Application;
+import javax.ws.rs.ApplicationPath;
+import javax.ws.rs.core.Application;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -44,13 +44,13 @@ public class JakartaRestConfiguration extends Application {
         classes.add(RoomResource.class);
         classes.add(SensorResource.class);
 
-        // Exception mappers — Part 5
+        // Exception mappers â€” Part 5
         classes.add(RoomNotEmptyExceptionMapper.class);       // 409
         classes.add(LinkedResourceNotFoundExceptionMapper.class); // 422
         classes.add(SensorUnavailableExceptionMapper.class);  // 403
         classes.add(GlobalExceptionMapper.class);             // 500 catch-all
 
-        // Request/Response logging filter — Part 5
+        // Request/Response logging filter â€” Part 5
         classes.add(ApiLoggingFilter.class);
 
         return classes;

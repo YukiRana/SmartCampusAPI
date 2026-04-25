@@ -8,17 +8,17 @@ import com.mycompany.smartcampusapi.model.ApiError;
 import com.mycompany.smartcampusapi.model.Sensor;
 import com.mycompany.smartcampusapi.service.DataStore;
 
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 
 /**
  * Sensor resource at /api/v1/sensors.
@@ -40,7 +40,7 @@ import jakarta.ws.rs.core.UriInfo;
  * path segments would need a new route per combination.
  *
  * Sub-Resource Locator pattern benefits:
- * The getReadingsLocator method has no HTTP method annotation — JAX-RS recognises
+ * The getReadingsLocator method has no HTTP method annotation â€” JAX-RS recognises
  * it as a locator and delegates /sensors/{id}/readings to SensorReadingResource.
  * This keeps reading-history logic isolated in its own class, reducing the size
  * and complexity of this controller. Adding new reading endpoints (e.g. /summary)
@@ -103,7 +103,7 @@ public class SensorResource {
                 sensor.getRoomId().trim());
 
         // DataStore.addSensor throws LinkedResourceNotFoundException (-> 422)
-        // if roomId does not exist — caught by LinkedResourceNotFoundExceptionMapper
+        // if roomId does not exist â€” caught by LinkedResourceNotFoundExceptionMapper
         boolean created = DataStore.addSensor(clean);
         if (!created) {
             return Response.status(Response.Status.CONFLICT)
@@ -118,7 +118,7 @@ public class SensorResource {
     }
 
     /**
-     * Sub-resource locator — no HTTP method annotation.
+     * Sub-resource locator â€” no HTTP method annotation.
      * Delegates all /sensors/{sensorId}/readings requests to SensorReadingResource.
      */
     @Path("/{sensorId}/readings")
@@ -126,7 +126,7 @@ public class SensorResource {
             @PathParam("sensorId") String sensorId,
             @Context UriInfo uriInfo) {
         if (DataStore.getSensor(sensorId) == null) {
-            throw new jakarta.ws.rs.NotFoundException(
+            throw new javax.ws.rs.NotFoundException(
                     "Sensor '" + sensorId + "' was not found.");
         }
         return new SensorReadingResource(sensorId);

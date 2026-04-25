@@ -39,7 +39,7 @@ public final class DataStore {
     }
 
     // ------------------------------------------------------------------
-    // Demo seed — provides ready data for Postman/video demonstration
+    // Demo seed â€” provides ready data for Postman/video demonstration
     // ------------------------------------------------------------------
     private static void seedDemoData() {
         Room lib301 = new Room("LIB-301", "Library Quiet Study",  120);

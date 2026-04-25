@@ -10,14 +10,14 @@ import com.mycompany.smartcampusapi.model.Sensor;
 import com.mycompany.smartcampusapi.model.SensorReading;
 import com.mycompany.smartcampusapi.service.DataStore;
 
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 
 /**
  * Sub-resource for sensor reading history.
@@ -81,7 +81,7 @@ public class SensorReadingResource {
                     .build();
         }
         // DataStore.addReading throws SensorUnavailableException (-> 403)
-        // if sensor status is MAINTENANCE — caught by SensorUnavailableExceptionMapper
+        // if sensor status is MAINTENANCE â€” caught by SensorUnavailableExceptionMapper
         SensorReading saved = DataStore.addReading(sensorId, reading);
 
         Map<String, Object> body = new LinkedHashMap<>();
